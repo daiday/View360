@@ -7,7 +7,7 @@ if [ ! -f tmp.iconset ];then
     mkdir tmp.iconset
     else
     rm -f tmp.iconset
-if
+fi
 
 cd tmp.iconset
 
@@ -27,6 +27,5 @@ cd ..
 iconutil -c icns tmp.iconset -o logo.icns
 
 rm -rf tmp.iconset
-
 
 echo "Done"

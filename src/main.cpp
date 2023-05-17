@@ -1,4 +1,5 @@
 #include <fstream>
+#include <locale>
 
 #include <array>
 #include <raylib.h>
@@ -10,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "shader_source.h"
+#include "version.h"
 
 #if defined(PLATFORM_DESKTOP)
 #define GLSL_VERSION 330
@@ -66,8 +68,17 @@ float maxFov = 120.0f;
 float stepFov = 1.0f;
 float defaultFov = 45.0f;
 bool inverseWheel = true;
+int fontSize = 10;
 
 int main(int /*argc*/, char ** /*argv*/) {
+    // set locale for chinese
+    std::locale::global(std::locale("zh_CN.UTF-8"));
+
+#ifdef _DEBUG
+    SetTraceLogLevel(LOG_INFO);
+#else
+    SetTraceLogLevel(LOG_WARNING);
+#endif
 
     try {
         nlohmann::json json;
@@ -87,6 +98,7 @@ int main(int /*argc*/, char ** /*argv*/) {
             stepFov = json["config"]["stepFov"];
             defaultFov = json["config"]["defaultFov"];
             inverseWheel = json["config"]["inverseWheel"];
+            fontSize = json["config"]["fontSize"];
         }
     } catch (...) {
         TraceLog(LOG_WARNING, "config load failed");
@@ -94,11 +106,8 @@ int main(int /*argc*/, char ** /*argv*/) {
 
     const int screenWidth = 800;
     const int screenHeight = 450;
-    SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(screenWidth, screenHeight, "360 Viewer");
-
-    SetWindowIcon(LoadImage("icon.png"));
+    InitWindow(screenWidth, screenHeight, "全景图观察者");
 
     const int uniEnvMap = MATERIAL_MAP_CUBEMAP;
     const int uniEquirect = MATERIAL_MAP_ALBEDO;
@@ -149,16 +158,28 @@ int main(int /*argc*/, char ** /*argv*/) {
         }
 
         if (IsKeyPressed('1')) {
-            texture_size = 1024;
+            if (texture_size != 1024) {
+                texture_size = 1024;
+                regen = true;
+            }
         }
         if (IsKeyPressed('2')) {
-            texture_size = 2048;
+            if (texture_size != 2048) {
+                texture_size = 2048;
+                regen = true;
+            }
         }
         if (IsKeyPressed('3')) {
-            texture_size = 4096;
+            if (texture_size != 4096) {
+                texture_size = 4096;
+                regen = true;
+            }
         }
         if (IsKeyPressed('4')) {
-            texture_size = 8192;
+            if (texture_size != 8192) {
+                texture_size = 8192;
+                regen = true;
+            }
         }
 
         if (IsKeyPressed(KEY_C)) {
@@ -322,6 +343,7 @@ int main(int /*argc*/, char ** /*argv*/) {
         json["config"]["stepFov"] = stepFov;
         json["config"]["currentFov"] = currentFovy;
         json["config"]["inverseWheel"] = inverseWheel;
+        json["config"]["fontSize"] = fontSize;
 
         std::ofstream out("config.json");
         out << json.dump(2);
@@ -420,44 +442,41 @@ void regenCubeMap(Model &skybox, const char *filePath, const Shader &shader, boo
 static void drawInformation(const char *filename) {
     int posX1 = 10;
     int posX2 = 100;
-    int posY = 25;
+    int posY = 10;
     int posYOffset = 15;
 
     auto textColor = BLACK;
     auto textColorHighlight = BLUE;
 
-    //    DrawText("Hold F1 or 'h' to show help.", posX1, posY, 10, RED);
-    //    posY += posYOffset;
-
     if (filename) {
-        DrawText(filename, posX1, posY, 10, textColor);
+        DrawText(filename, posX1, posY, fontSize, textColor);
         posY += posYOffset;
     }
 
-    DrawText("[C]orrect Gamma:", posX1, posY, 10, textColor);
-    DrawText(gammaCorrect ? "On" : "Off", posX2, posY, 10, textColorHighlight);
+    DrawText("[C]orrect Gamma:", posX1, posY, fontSize, textColor);
+    DrawText(gammaCorrect ? "On" : "Off", posX2, posY, fontSize, textColorHighlight);
     posY += posYOffset;
 
-    DrawText("F[l]ip Image:", posX1, posY, 10, textColor);
-    DrawText(flipImage ? "On" : "Off", posX2, posY, 10, textColorHighlight);
+    DrawText("F[l]ip Image:", posX1, posY, fontSize, textColor);
+    DrawText(flipImage ? "On" : "Off", posX2, posY, fontSize, textColorHighlight);
     posY += posYOffset;
 
-    DrawText("[P]anorama:", posX1, posY, 10, textColor);
-    DrawText(needGenCubeMap ? "Yes" : "No", posX2, posY, 10, textColorHighlight);
+    DrawText("[P]anorama:", posX1, posY, fontSize, textColor);
+    DrawText(needGenCubeMap ? "Yes" : "No", posX2, posY, fontSize, textColorHighlight);
     posY += posYOffset;
 
-    DrawText("Aspect Ratio:", posX1, posY, 10, textColor);
-    DrawText(TextFormat("%g : %g", ratioList[ratioIndex][0], ratioList[ratioIndex][1]), posX2, posY, 10, textColorHighlight);
+    DrawText("Aspect Ratio:", posX1, posY, fontSize, textColor);
+    DrawText(TextFormat("%g : %g", ratioList[ratioIndex][0], ratioList[ratioIndex][1]), posX2, posY, fontSize, textColorHighlight);
     posY += posYOffset;
 
-    DrawText("Camera Fovy:", posX1, posY, 10, textColor);
-    DrawText(TextFormat("%g", currentFovy), posX2, posY, 10, textColorHighlight);
+    DrawText("Camera Fovy:", posX1, posY, fontSize, textColor);
+    DrawText(TextFormat("%g", currentFovy), posX2, posY, fontSize, textColorHighlight);
     posY += posYOffset;
 }
 
 static void drawHelpIcon() {
     int posX = 10;
-    int posY = 10;
+    int posY = GetScreenHeight() - 10 - fontSize;
     int size = 15;
 
     auto textColor = BLACK;
@@ -466,14 +485,13 @@ static void drawHelpIcon() {
     DrawRectangle(posX, posY, size, size, {0, 0, 0, 0});
 
     if (CheckCollisionPointRec(GetMousePosition(), {(float) posX, (float) posY, (float) size, (float) size})) {
-        DrawText("Hold F1 or 'h' to show help.", posX, posY, 10, RED);
+        DrawText("Hold F1 or 'h' to show help.", posX, posY, fontSize, RED);
     } else {
-        DrawText(" ? ", posX, posY, 10, RED);
+        DrawText(" ? ", posX, posY, fontSize, RED);
     }
 }
 
 static void drawHelp() {
-    int fontSize = 10;
     int margin = 5;
     int spacing = 5;
     auto textColor = BLACK;
@@ -496,7 +514,7 @@ static void drawHelp() {
     contents.emplace_back("DROP FILE TO OPEN!");
     contents.emplace_back("Use Arrow Up/Down to view in history.");
     contents.emplace_back("Drop multiple files, will clear history.");
-    contents.emplace_back(TextFormat("[%s: %s %s]", compile_mode, __DATE__, __TIME__));
+    contents.emplace_back(TextFormat("[%s] [%s] [%s %s]", VERSION_STRING, compile_mode, __DATE__, __TIME__));
 
     int maxWidth = 0;
     for (const auto &content: contents) {
