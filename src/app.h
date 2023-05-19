@@ -27,6 +27,12 @@ private:
 
     void handleEvent();
 
+    void handleKeyEvent();
+
+    void handleMouseEvent();
+
+    void handleDropEvent();
+
     void draw();
 
     void drawHelp();

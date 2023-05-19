@@ -7,6 +7,8 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
+extern std::string get_config_path(const std::string &appName);
+
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Config,
                                    ratioScale,
                                    gammaCorrect,
@@ -21,7 +23,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Config,
                                    inverseWheel,
                                    fontSize)
 
+
 static const char *gConfigFile = "config.json";
+static const char *gAppName = "view360";
 
 extern Config *getConfig() {
     static Config config;
@@ -30,8 +34,10 @@ extern Config *getConfig() {
 
 extern void loadConfig() {
     try {
+        std::string path = get_config_path(gAppName) + "/" + gConfigFile;
+
         nlohmann::json json;
-        std::ifstream in(gConfigFile);
+        std::ifstream in(path);
         if (in.is_open()) {
             in >> json;
             in.close();
@@ -52,7 +58,9 @@ extern void saveConfig() {
         auto *cfg = getConfig();
         to_json(json, *cfg);
 
-        std::ofstream out(gConfigFile);
+        std::string path = get_config_path(gAppName) + "/" + gConfigFile;
+
+        std::ofstream out(path);
         if (out.is_open()) {
             out << json.dump(2);
             out.close();

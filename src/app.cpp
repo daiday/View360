@@ -92,37 +92,42 @@ void App::handleEvent() {
     _reload = false;
     _showHelp = false;
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-        UpdateCamera(&_camera, CAMERA_FIRST_PERSON);
+    handleKeyEvent();
+
+    handleMouseEvent();
+
+    if (IsFileDropped()) {
+        handleDropEvent();
     }
 
-    auto delta = GetMouseWheelMove();
-    if (fabsf(delta) > 0.1f) {
-        if (getConfig()->inverseWheel) {
-            delta = -delta;
-        }
-        _currentFovy += delta * getConfig()->stepFov;
-        _currentFovy = Clamp(_currentFovy, getConfig()->minFov, getConfig()->maxFov);
+    if (_reload) {
+        loadCubemap();
+        _reload = false;
     }
+}
 
+void App::handleKeyEvent() {
     if (IsKeyPressed('1')) {
         if (_textureSize != 1024) {
             _textureSize = 1024;
             _reload = true;
         }
     }
+
     if (IsKeyPressed('2')) {
         if (_textureSize != 2048) {
             _textureSize = 2048;
             _reload = true;
         }
     }
+
     if (IsKeyPressed('3')) {
         if (_textureSize != 4096) {
             _textureSize = 4096;
             _reload = true;
         }
     }
+
     if (IsKeyPressed('4')) {
         if (_textureSize != 8192) {
             _textureSize = 8192;
@@ -130,15 +135,15 @@ void App::handleEvent() {
         }
     }
 
-    Shader &shaderSkybox = _skybox.materials[0].shader;
-
     if (IsKeyPressed(KEY_C)) {
+        Shader &shaderSkybox = _skybox.materials[0].shader;
         getConfig()->gammaCorrect = !getConfig()->gammaCorrect;
         int uniDoGamma = getConfig()->gammaCorrect ? 1 : 0;
         SetShaderValue(shaderSkybox, GetShaderLocation(shaderSkybox, "doGamma"), &uniDoGamma, SHADER_UNIFORM_INT);
     }
 
     if (IsKeyPressed(KEY_L)) {
+        Shader &shaderSkybox = _skybox.materials[0].shader;
         getConfig()->flipImage = !getConfig()->flipImage;
         int uniFlipped = getConfig()->flipImage ? 1 : 0;
         SetShaderValue(shaderSkybox, GetShaderLocation(shaderSkybox, "vflipped"), &uniFlipped, SHADER_UNIFORM_INT);
@@ -156,6 +161,18 @@ void App::handleEvent() {
             RestoreWindow();
         else
             MaximizeWindow();
+    }
+
+    if (IsKeyPressed(KEY_I)) {
+        getConfig()->showInfo = !getConfig()->showInfo;
+    }
+
+    if (IsKeyPressed(KEY_G)) {
+        getConfig()->showGrid = !getConfig()->showGrid;
+    }
+
+    if (IsKeyDown(KEY_F1) || IsKeyDown(KEY_H)) {
+        _showHelp = true;
     }
 
     if (IsKeyPressed(KEY_LEFT)) {
@@ -178,64 +195,67 @@ void App::handleEvent() {
         SetWindowSize((int) w, (int) h);
     }
 
+    if (IsKeyPressed(KEY_UP)) {
+        if (!_fileList.empty() && _currentFileIndex > 0) {
+            --_currentFileIndex;
+            _reload = true;
+        }
+    }
+
+    if (IsKeyPressed(KEY_DOWN)) {
+        if (!_fileList.empty() && _currentFileIndex < (int) _fileList.size() - 1) {
+            ++_currentFileIndex;
+            _reload = true;
+        }
+    }
+}
+
+void App::handleMouseEvent() {
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        UpdateCamera(&_camera, CAMERA_FIRST_PERSON);
+    }
+
+    auto delta = GetMouseWheelMove();
+    if (fabsf(delta) > 0.1f) {
+        if (getConfig()->inverseWheel) {
+            delta = -delta;
+        }
+        _currentFovy += delta * getConfig()->stepFov;
+        _currentFovy = Clamp(_currentFovy, getConfig()->minFov, getConfig()->maxFov);
+    }
+}
+
+void App::handleDropEvent() {
+    _fileList.clear();
+    _currentFileIndex = -1;
+    const char *filters = ".png;.jpg;.hdr;.bmp;.tga";
+    FilePathList droppedFiles = LoadDroppedFiles();
+    if (droppedFiles.count == 1) {
+        const char *path = droppedFiles.paths[0];
+        if (IsPathFile(path)) {
+            if (IsFileExtension(path, filters)) {
+                _fileList.emplace_back(path);
+            }
+        } else {
+            auto subFiles = LoadDirectoryFilesEx(path, filters, false);
+            for (unsigned int i = 0; i < subFiles.count; ++i) {
+                _fileList.emplace_back(subFiles.paths[i]);
+            }
+            UnloadDirectoryFiles(subFiles);
+        }
+
+    } else if (droppedFiles.count > 1) {
+        for (unsigned int i = 0; i < droppedFiles.count; ++i) {
+            if (IsFileExtension(droppedFiles.paths[i], filters)) {
+                _fileList.emplace_back(droppedFiles.paths[i]);
+            }
+        }
+    }
     if (!_fileList.empty()) {
-        if (IsKeyPressed(KEY_UP)) {
-            if (_currentFileIndex > 0) {
-                --_currentFileIndex;
-                _reload = true;
-            }
-        }
-
-        if (IsKeyPressed(KEY_DOWN)) {
-            if (_currentFileIndex < (int) _fileList.size() - 1) {
-                ++_currentFileIndex;
-                _reload = true;
-            }
-        }
+        _currentFileIndex = 0;
+        _reload = true;
     }
-
-    if (IsKeyPressed(KEY_I)) {
-        getConfig()->showInfo = !getConfig()->showInfo;
-    }
-
-    if (IsKeyPressed(KEY_G)) {
-        getConfig()->showGrid = !getConfig()->showGrid;
-    }
-
-    if (IsKeyDown(KEY_F1) || IsKeyDown(KEY_H)) {
-        _showHelp = true;
-    }
-
-    if (IsFileDropped()) {
-        FilePathList droppedFiles = LoadDroppedFiles();
-        if (droppedFiles.count == 1) {
-            if (IsFileExtension(droppedFiles.paths[0], ".png;.jpg;.hdr;.bmp;.tga")) {
-                _fileList.emplace_back(droppedFiles.paths[0]);
-                _currentFileIndex = (int) _fileList.size() - 1;
-                _reload = true;
-            }
-        } else if (droppedFiles.count > 1) {
-            _fileList.clear();
-            _currentFileIndex = -1;
-            for (unsigned int i = 0; i < droppedFiles.count; ++i) {
-                if (IsFileExtension(droppedFiles.paths[i], ".png;.jpg;.hdr;.bmp;.tga")) {
-                    _fileList.emplace_back(droppedFiles.paths[i]);
-                }
-            }
-            if (!_fileList.empty()) {
-                _currentFileIndex = 0;
-            }
-            if (_currentFileIndex >= 0) {
-                _reload = true;
-            }
-        }
-        UnloadDroppedFiles(droppedFiles);
-    }
-
-    if (_reload) {
-        loadCubemap();
-        _reload = false;
-    }
+    UnloadDroppedFiles(droppedFiles);
 }
 
 void App::draw() {
@@ -299,8 +319,9 @@ void App::drawHelp() {
     contents.emplace_back("Use Mouse Whell to change camera fovy.");
     contents.emplace_back("Use Arrow Left/Right to change window ratio.");
     contents.emplace_back("DROP FILE TO OPEN!");
+    contents.emplace_back("Drop file will clear history.");
+    contents.emplace_back("You can drop multiple files, or a single directory.");
     contents.emplace_back("Use Arrow Up/Down to view in history.");
-    contents.emplace_back("Drop multiple files, will clear history.");
     contents.emplace_back(TextFormat("[%s] [%s] [%s %s]", VERSION_STRING, compile_mode, __DATE__, __TIME__));
 
     int maxWidth = 0;
